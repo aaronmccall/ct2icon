@@ -18,7 +18,7 @@ def slugify(string):
     string = unidecode.unidecode(string).lower()
     return re.sub(r'\W+', '_', string)
 
-def request_data_builder(auth={}, module='', section='', action='', data={}, filters={}):
+def request_data_builder(auth={}, module='', section='', action='', data={}, filters={}, sort={}):
     template = conf.REQUEST_TEMPLATE.copy()
     template['Auth'] = get_auth_data()
     template['Request'] = {
@@ -30,7 +30,7 @@ def request_data_builder(auth={}, module='', section='', action='', data={}, fil
         template['Request']['Data'] = data
     if filters:
         template['Request']['Filters'] = filters
-    print template
+    # print template
     return template
 
 

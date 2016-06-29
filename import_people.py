@@ -93,16 +93,79 @@ def import_icon_people(in_file):
                                           helpers.get_auth_data(),
                                           'membership', 'members', 'create')
 
+    household_retriever = functools.partial(helpers.request_data_builder,
+                                            helpers.get_auth_data(),
+                                            'membership', 'households', 'read')
+
+    member_retriever = functools.partial(helpers.request_data_builder,
+                                          helpers.get_auth_data(),
+                                          'membership', 'members', 'read')
+
     i = 0
     for person in people:
+        person_id = None
+        household_id = None
+        if 'id' in person: continue # This person doesn't need to be imported.
         if person['household_id'] in households:
             household = households[person['household_id']]
-            if not 'id' in household:
-                if household['status'] in conf.DEFAULT_STATUSES:
-                    household['status'] = conf.DEFAULT_STATUSES[household['status']]
-                hh_data = helpers.post_json(helpers.get_api_url(), household_creator(household))
-                print hh_data       
-        break
+            if not 'id' in household: # This person's household needs to be imported.
+                # if household['status'] in conf.DEFAULT_STATUSES:
+                #     household['status'] = conf.DEFAULT_STATUSES[household['status']]
+                hh_request = household_creator(household)
+                # print hh_request
+                hh_data = helpers.post_json(helpers.get_api_url(), hh_request)
+                if 'number' in hh_data:
+                    print 'Error (%d): %s' % (hh_data['number'], hh_data['message'])
+                    if hh_data['number'] == 421:
+                        hh_data = helpers.post_json(helpers.get_api_url(), household_retriever(None, {
+                                                    'last_name': household['last_name'],
+                                                    'city': household['city'],
+                                                    'state': household['state']}))
+                        if 'households' in hh_data and len(hh_data['households']) == 1:
+                            hh_string = '%s %s in %s, %s' % (household['first_name'], household['last_name'],
+                                                             household['city'], household['state'])
+                            household_id = int(hh_data['households'][0]['id'])
+                            print 'Found existing record for %s with ID %s' % (hh_string, household_id)
+                        else:
+                            print 'Unable to find certain match for %s' % hh_string
+                elif 'statistics' in hh_data:
+                    household_id = int(hh_data['statistics']['last_id'])
+            else:
+                household_id = int(household['id'])
+
+            if household_id:
+                person_data = helpers.post_json(helpers.get_api_url(),member_retriever(None, {
+                                                'first_name': person['first_name'],
+                                                'last_name': person['last_name']}))
+                if 'members' in person_data and len(person_data['members']) == 1:
+                    print "%s %s already in IconCMO. Skipping." % (person['first_name'], person['last_name'])
+                    continue
+                person['household_id'] = household_id
+                # if person['status'] in conf.DEFAULT_STATUSES:
+                #     person['status'] = conf.DEFAULT_STATUSES[person['status']]
+                if 'phone' in person and person['phone'] == household['phone']:
+                    if 'phones' in person:
+                        for phone in person['phones']:
+                            if phone['id'] == 'Cell':
+                                person['phone'] == phone['phone']
+                        del person['phones']
+                if 'email' in person:
+                    del person['email']
+
+                for key in person.keys():
+                    if key in household and person[key] == household[key]:
+                        if key in ['status', 'last_name', 'first_name']: continue
+                        del person[key]
+                p_request = member_creator(person)
+                # print p_request
+                p_data = helpers.post_json(helpers.get_api_url(), p_request)
+                # print p_data
+            else:
+                print 'Unable to import %s %s due to problems with household identity.' % (
+                    person['first_name'], person['last_name']
+                )
+        i += 1
+        # if i == 5: break
 
     
 
@@ -114,6 +177,7 @@ if __name__ == '__main__':
     cont_args = ['-c', '--continue']
     parser.add_argument(*cont_args, action='store_true', help='Continue using existing temp files.')
     args = parser.parse_args()
+    conf.args = args
 
     if args.file and 'csv' in os.path.basename(args.file[0]) and os.path.exists(args.file[0]):
         in_file = args.file[0]

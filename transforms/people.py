@@ -60,16 +60,22 @@ def birthday_handler(key, value, out_dict):
         )
         out_dict['birth_date'] = birth_date
 
+def name_handler(key, value, out_dict):
+
+    if value:
+        out_dict['preferred_name'] = value
+
 mapper = {
     'address': addr_handler,
     'city_state_zip': csz_handler,
     'membership_status': status_handler,
     'gender': gender_handler,
-    'birthday': birthday_handler
+    'birthday': birthday_handler, 
+    'name': name_handler
 }
 
 GENDER_MAP = {'F': 'Female', 'M': 'Male'}
-RELATIONSHIP_MAP = {'Married Female': 'Wife', 'Married Male': 'Husband'}
+RELATIONSHIP_MAP = {'default': 'Other','Married Female': 'Wife', 'Married Male': 'Husband'}
 def relationship_handler(person):
     if 'gender' not in person:
         print person
@@ -83,7 +89,7 @@ def relationship_handler(person):
     if relationship in RELATIONSHIP_MAP:
         person['relationship'] = RELATIONSHIP_MAP[relationship]
     else:
-        person['relationship'] = relationship
+        person['relationship'] = RELATIONSHIP_MAP['default']
     del person['marital_status']
 
 def greeting_handler(person):
